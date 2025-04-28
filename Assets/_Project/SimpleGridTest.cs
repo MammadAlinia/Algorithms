@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using GraphSystem;
-using Grid;
+using GridSystem;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Serialization;
+using Grid = UnityEngine.Grid;
 
 namespace _Project
 {
@@ -12,7 +15,7 @@ namespace _Project
         [SerializeField] private int width, height;
         [SerializeField] private Vector2 cellSize;
 
-        private Grid.Grid _grid;
+        private GridSystem.Grid _grid;
         private GridDrawer2D _gridDrawer2D;
 
         private GridCell _prevSelectedNode;
@@ -28,12 +31,12 @@ namespace _Project
 
         private void OnValidate()
         {
-            _grid = new Grid.Grid(width, height, transform.position, cellSize);
+            _grid = new GridSystem.Grid(width, height, transform.position, cellSize);
         }
 
         private void Start()
         {
-            _grid = new Grid.Grid(width, height, transform.position, cellSize);
+            _grid = new GridSystem.Grid(width, height, transform.position, cellSize);
 
             var xFactor = width * cellSize.x;
             var yFactor = height * cellSize.y;
@@ -71,7 +74,69 @@ namespace _Project
             UpdateStartPoint();
 
             UpdateTargetPoint();
+
+            if (Input.GetKeyDown(KeyCode.G))
+            {
+                CalculateShortestPath();
+            }
+
             UpdateColors();
+        }
+
+        Dictionary<GridCell, float> fCost = new Dictionary<GridCell, float>();
+
+        private async void CalculateShortestPath()
+        {
+            fCost = new Dictionary<GridCell, float>();
+            // calculate shortest path via a* algorithm
+
+            if (_targetNodes.Count == 0)
+            {
+                return;
+            }
+
+            var currentNode = _startNode;
+            var targetNode = _targetNodes.First();
+
+
+            var toVisit = new Queue<GridCell>();
+            var visited = new HashSet<GridCell>();
+
+            var hCost = new Dictionary<GridCell, float>();
+            var gCost = new Dictionary<GridCell, float>();
+
+            toVisit.Enqueue(currentNode);
+
+            while (toVisit.Count > 0)
+            {
+                Debug.Break();
+                await Awaitable.NextFrameAsync();
+                Debug.DrawLine(currentNode.WorldPosition, currentNode.WorldPosition + Vector3.up * .3f, Color.red);
+
+                if (currentNode.Equals(targetNode))
+                {
+                    break;
+                }
+
+                currentNode = toVisit.Dequeue();
+                visited.Add(currentNode);
+
+
+                var neighbors = _grid.GetNeighbors(currentNode);
+
+                hCost[currentNode] = Vector2Int.Distance(currentNode.GridPosition, targetNode.GridPosition);
+                fCost[currentNode] = hCost[currentNode] + gCost.GetValueOrDefault(currentNode, 0);
+
+
+                foreach (var neighbor in neighbors)
+                {
+                    if (!visited.Contains(neighbor) && !toVisit.Contains(neighbor)&& _valid[neighbor.GridPosition.x, neighbor.GridPosition.y])
+                    {
+                        gCost[neighbor] = gCost.GetValueOrDefault(currentNode, 0) + 1;
+                        toVisit.Enqueue(neighbor);
+                    }
+                }
+            }
         }
 
         private void UpdateColors()
@@ -81,9 +146,12 @@ namespace _Project
                 for (int y = 0; y < height; y++)
                 {
                     var cell = _grid.GetCell(x, y);
-                    var color = _currentNeighbors.Contains(cell) ? Color.gray : Color.white;
+                    var color = _currentNeighbors.Contains(cell)
+                        ? Color.gray
+                        : Color.Lerp(Color.clear, Color.white, .3f);
 
-                    color = _startNode.Equals(cell) ? Color.green : color;
+
+                    color = _startNode != null && _startNode.Equals(cell) ? Color.green : color;
                     color = _targetNodes.Contains(cell) ? Color.blue : color;
 
                     color = _valid[x, y]
@@ -100,7 +168,8 @@ namespace _Project
         {
             if (Input.GetMouseButtonDown(1)) // add or remove target points
             {
-                if (!_valid[_selectedNode.GridPosition.x, _selectedNode.GridPosition.y] || _selectedNode.Equals(_startNode))
+                if (!_valid[_selectedNode.GridPosition.x, _selectedNode.GridPosition.y] ||
+                    _selectedNode.Equals(_startNode))
                     return;
 
 
@@ -157,6 +226,15 @@ namespace _Project
                         _gridDrawer2D.SetSize(x, y, _grid.CellSize * .95f);
                     }
                 }
+            }
+        }
+
+        private void OnDrawGizmos()
+        {
+            foreach (var f in fCost)
+            {
+                Handles.color = Color.black;
+                Handles.Label(f.Key.WorldPosition, f.Value.ToString("F1"));
             }
         }
     }

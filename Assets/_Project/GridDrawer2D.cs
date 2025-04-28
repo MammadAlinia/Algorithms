@@ -6,7 +6,7 @@ namespace _Project
     {
         private readonly GameObject[,] _gridCells;
 
-        public GridDrawer2D(Grid.Grid grid)
+        public GridDrawer2D(GridSystem.Grid grid)
         {
             _gridCells = new GameObject[grid.Width, grid.Height];
 
@@ -25,8 +25,8 @@ namespace _Project
             var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
             var renderer = go.GetComponent<MeshRenderer>();
             renderer.material.shader = Shader.Find("Universal Render Pipeline/Unlit");
-            renderer.material.color = Color.white;
-            
+            renderer.material.color = Color.Lerp(Color.clear, Color.white, .3f);
+
             go.transform.position = worldPosition;
             go.transform.localScale = cellSize;
 

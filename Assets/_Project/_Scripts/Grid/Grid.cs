@@ -5,7 +5,7 @@ using Unity.Collections;
 using Unity.VisualScripting;
 using UnityEngine;
 
-namespace Grid
+namespace GridSystem
 {
     public class Grid
     {
@@ -32,9 +32,14 @@ namespace Grid
                 {
                     var gridPos = new Vector2(x * cellSize.x, y * cellSize.y) + new Vector2(origin.x, origin.y);
 
+                    Cells[x, y] = new GridCell()
+                    {
+                        GridPosition = new Vector2Int(x, y),
+                        WorldPosition = gridPos - offset
+                    };
 
-                    Cells[x, y].GridPosition = new Vector2Int(x, y);
-                    Cells[x, y].WorldPosition = gridPos - offset;
+                    // Cells[x, y].GridPosition = new Vector2Int(x, y);
+                    // Cells[x, y].WorldPosition = gridPos - offset;
                 }
             }
         }
@@ -102,24 +107,15 @@ namespace Grid
         }
     }
 
-    public struct GridCell : IEquatable<GridCell>
+    public class GridCell 
     {
         public Vector3 WorldPosition;
         public Vector2Int GridPosition;
 
-        public bool Equals(GridCell other)
-        {
-            return WorldPosition.Equals(other.WorldPosition) && GridPosition.Equals(other.GridPosition);
-        }
+   
 
-        public override bool Equals(object obj)
-        {
-            return obj is GridCell other && Equals(other);
-        }
+      
 
-        public override int GetHashCode()
-        {
-            return HashCode.Combine(WorldPosition, GridPosition);
-        }
+       
     }
 }
