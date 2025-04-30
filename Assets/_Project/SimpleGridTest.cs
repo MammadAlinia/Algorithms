@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using GraphSystem;
 using GridSystem;
 using UnityEditor;
@@ -28,11 +29,8 @@ namespace _Project
 
         private bool[,] _valid;
 
+        private bool calculating = false;
 
-        private void OnValidate()
-        {
-            _grid = new GridSystem.Grid(width, height, transform.position, cellSize);
-        }
 
         private void Start()
         {
@@ -75,68 +73,109 @@ namespace _Project
 
             UpdateTargetPoint();
 
-            if (Input.GetKeyDown(KeyCode.G))
+            if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetKeyDown(KeyCode.Space))
             {
-                CalculateShortestPath();
+                if (!calculating)
+                    _ = CalculateShortestPath();
             }
 
             UpdateColors();
         }
 
         Dictionary<GridCell, float> fCost = new Dictionary<GridCell, float>();
+        Dictionary<GridCell, GridCell> cameFrom = new Dictionary<GridCell, GridCell>();
+        private GridCell currentNode = new GridCell();
+        public List<GridCell> shortestPath = new List<GridCell>();
 
-        private async void CalculateShortestPath()
+        private async Task CalculateShortestPath()
         {
-            fCost = new Dictionary<GridCell, float>();
             // calculate shortest path via a* algorithm
 
             if (_targetNodes.Count == 0)
-            {
                 return;
-            }
 
-            var currentNode = _startNode;
+            if (_valid[_startNode.GridPosition.x, _startNode.GridPosition.y] == false)
+                return;
+
+            if (_targetNodes.Contains(_startNode))
+                return;
+
+            Debug.Log("calculate");
+
+            calculating = true;
+            fCost = new Dictionary<GridCell, float>();
+            cameFrom = new Dictionary<GridCell, GridCell>();
+
+            currentNode = _startNode;
             var targetNode = _targetNodes.First();
 
 
-            var toVisit = new Queue<GridCell>();
+            var toVisit = new List<GridCell>();
             var visited = new HashSet<GridCell>();
 
             var hCost = new Dictionary<GridCell, float>();
             var gCost = new Dictionary<GridCell, float>();
 
-            toVisit.Enqueue(currentNode);
+            toVisit.Add(currentNode);
 
             while (toVisit.Count > 0)
             {
-                Debug.Break();
+                //  currentNode = toVisit.First();
+                currentNode = toVisit.OrderBy(n => fCost.GetValueOrDefault(n, float.MaxValue)).First();
+
+                await Awaitable.MainThreadAsync();
                 await Awaitable.NextFrameAsync();
-                Debug.DrawLine(currentNode.WorldPosition, currentNode.WorldPosition + Vector3.up * .3f, Color.red);
 
                 if (currentNode.Equals(targetNode))
                 {
+                    // construct the shortest path
+                    ReconstructPath(currentNode);
+                    calculating = false;
                     break;
                 }
 
-                currentNode = toVisit.Dequeue();
+                toVisit.Remove(currentNode);
                 visited.Add(currentNode);
 
-
                 var neighbors = _grid.GetNeighbors(currentNode);
-
-                hCost[currentNode] = Vector2Int.Distance(currentNode.GridPosition, targetNode.GridPosition);
-                fCost[currentNode] = hCost[currentNode] + gCost.GetValueOrDefault(currentNode, 0);
 
 
                 foreach (var neighbor in neighbors)
                 {
-                    if (!visited.Contains(neighbor) && !toVisit.Contains(neighbor)&& _valid[neighbor.GridPosition.x, neighbor.GridPosition.y])
+                    if (!visited.Contains(neighbor) &&
+                        _valid[neighbor.GridPosition.x, neighbor.GridPosition.y])
                     {
-                        gCost[neighbor] = gCost.GetValueOrDefault(currentNode, 0) + 1;
-                        toVisit.Enqueue(neighbor);
+                        float tentativeGCost = gCost.GetValueOrDefault(currentNode, 0) + 1;
+
+                        if (!gCost.ContainsKey(neighbor) || tentativeGCost < gCost[neighbor])
+                        {
+                            cameFrom[neighbor] = currentNode;
+                            gCost[neighbor] = tentativeGCost;
+                            hCost[neighbor] = Vector2Int.Distance(neighbor.GridPosition, targetNode.GridPosition);
+                            fCost[neighbor] = gCost[neighbor] + hCost[neighbor];
+
+                            if (!toVisit.Contains(neighbor))
+                                toVisit.Add(neighbor);
+                        }
                     }
                 }
             }
+
+            calculating = false;
+        }
+
+        void ReconstructPath(GridCell current)
+        {
+            var path = new List<GridCell>();
+
+            while (cameFrom.ContainsKey(current))
+            {
+                path.Add(current);
+                current = cameFrom[current];
+            }
+
+            path.Reverse();
+            shortestPath = new List<GridCell>(path);
         }
 
         private void UpdateColors()
@@ -151,12 +190,11 @@ namespace _Project
                         : Color.Lerp(Color.clear, Color.white, .3f);
 
 
-                    color = _startNode != null && _startNode.Equals(cell) ? Color.green : color;
-                    color = _targetNodes.Contains(cell) ? Color.blue : color;
+                    color = _startNode.Equals(cell) ? Color.green : color;
+                    color = shortestPath.Contains(cell) ? Color.blue : color;
+                    color = _valid[x, y] ? color : Color.black;
 
-                    color = _valid[x, y]
-                        ? color
-                        : Color.black;
+                    color = _targetNodes.Contains(cell) ? Color.red : color;
 
 
                     _gridDrawer2D.UpdateColor(x, y, color);
@@ -166,21 +204,16 @@ namespace _Project
 
         private void UpdateTargetPoint()
         {
-            if (Input.GetMouseButtonDown(1)) // add or remove target points
+            if (Input.GetMouseButtonDown(1))
             {
                 if (!_valid[_selectedNode.GridPosition.x, _selectedNode.GridPosition.y] ||
                     _selectedNode.Equals(_startNode))
                     return;
 
-
                 if (_targetNodes.Contains(_selectedNode))
-                {
                     _targetNodes.Remove(_selectedNode);
-                    return;
-                }
-
-
-                _targetNodes.Add(_selectedNode);
+                else
+                    _targetNodes.Add(_selectedNode);
             }
         }
 
@@ -190,22 +223,19 @@ namespace _Project
             {
                 _prevSelectedNode = _startNode;
                 _startNode = _selectedNode;
-
-                if (_targetNodes.Remove(_startNode))
-                {
-                }
+                _targetNodes.Remove(_startNode);
             }
         }
 
         private void UpdateValidCell()
         {
-            var gridPositionX = _selectedNode.GridPosition.x;
-            var gridPositionY = _selectedNode.GridPosition.y;
+            var x = _selectedNode.GridPosition.x;
+            var y = _selectedNode.GridPosition.y;
 
             if (Input.GetKeyDown(KeyCode.Space)) // add or remove cells
             {
-                _valid[gridPositionX, gridPositionY] =
-                    !_valid[gridPositionX, gridPositionY];
+                _valid[x, y] =
+                    !_valid[x, y];
             }
         }
 
@@ -229,13 +259,20 @@ namespace _Project
             }
         }
 
+#if UNITY_EDITOR
         private void OnDrawGizmos()
         {
-            foreach (var f in fCost)
+            if (_grid != null && currentNode != null)
             {
-                Handles.color = Color.black;
-                Handles.Label(f.Key.WorldPosition, f.Value.ToString("F1"));
+                Gizmos.DrawWireSphere(currentNode.WorldPosition, .4f);
+
+                foreach (var f in fCost)
+                {
+                    Handles.color = Color.black;
+                    Handles.Label(f.Key.WorldPosition, f.Value.ToString("F1"));
+                }
             }
         }
+#endif
     }
 }

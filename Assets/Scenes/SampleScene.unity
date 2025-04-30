@@ -462,8 +462,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 410197b57dc94d4fb86ec5d8823bcdcd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  width: 15
-  height: 7
+  width: 10
+  height: 10
   cellSize: {x: 1.15, y: 1}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
