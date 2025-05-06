@@ -76,7 +76,7 @@ namespace _Project
             if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetKeyDown(KeyCode.Space))
             {
                 if (!calculating)
-                    _ = CalculateShortestPath();
+                    _ = ShortestPathDijkstra();
             }
 
             UpdateColors();
@@ -85,12 +85,13 @@ namespace _Project
         Dictionary<GridCell, float> fCost = new Dictionary<GridCell, float>();
         Dictionary<GridCell, GridCell> cameFrom = new Dictionary<GridCell, GridCell>();
         private GridCell currentNode = new GridCell();
-        public List<GridCell> shortestPath = new List<GridCell>();
+        public Dictionary<GridCell, List<GridCell>> shortestPath = new Dictionary<GridCell, List<GridCell>>();
 
-        private async Task CalculateShortestPath()
+        private async Task ShortestPathAStar()
         {
             // calculate shortest path via a* algorithm
 
+            shortestPath.Clear();
             if (_targetNodes.Count == 0)
                 return;
 
@@ -129,7 +130,7 @@ namespace _Project
                 if (currentNode.Equals(targetNode))
                 {
                     // construct the shortest path
-                    ReconstructPath(currentNode);
+                    shortestPath[targetNode] = ReconstructPath(currentNode);
                     calculating = false;
                     break;
                 }
@@ -164,7 +165,73 @@ namespace _Project
             calculating = false;
         }
 
-        void ReconstructPath(GridCell current)
+        public async Task ShortestPathDijkstra()
+        {
+            shortestPath.Clear();
+            if (_targetNodes.Count == 0)
+                return;
+
+            if (_valid[_startNode.GridPosition.x, _startNode.GridPosition.y] == false)
+                return;
+
+            if (_targetNodes.Contains(_startNode))
+                return;
+
+            Debug.Log("calculate");
+
+            calculating = true;
+            fCost = new Dictionary<GridCell, float>();
+            cameFrom = new Dictionary<GridCell, GridCell>();
+
+            var unvisitedNodes =
+                new List<GridCell>(_grid.CellList.Where(x => _valid[x.GridPosition.x, x.GridPosition.y]));
+
+            var visitedNode = new HashSet<GridCell>();
+            var heuristics = new Dictionary<GridCell, float>();
+            heuristics[_startNode] = 0;
+            currentNode = _startNode;
+
+            // calculate dijkstra
+            while (unvisitedNodes.Count != 0)
+            {
+                await Awaitable.MainThreadAsync();
+                await Awaitable.NextFrameAsync();
+                currentNode = unvisitedNodes.OrderBy(x => heuristics.GetValueOrDefault(x, float.MaxValue)).First();
+                var currentHeuristic = heuristics[currentNode];
+                unvisitedNodes.Remove(currentNode);
+
+                foreach (GridCell neighbor in _grid.GetNeighbors(currentNode)
+                             .Where(x => _valid[x.GridPosition.x, x.GridPosition.y]))
+                {
+                    if (visitedNode.Contains(neighbor))
+                        continue;
+
+                    var distance = Vector2Int.Distance(currentNode.GridPosition, neighbor.GridPosition);
+
+
+                    var newHCost = distance + currentHeuristic;
+
+                    if (newHCost < heuristics.GetValueOrDefault(neighbor, float.MaxValue))
+                    {
+                        cameFrom[neighbor] = currentNode;
+                        heuristics[neighbor] = newHCost;
+                    }
+                }
+
+                visitedNode.Add(currentNode);
+            }
+
+            //calculate paths
+
+            foreach (GridCell target in _targetNodes)
+            {
+                shortestPath[target] = ReconstructPath(target);
+            }
+
+            calculating = false;
+        }
+
+        List<GridCell> ReconstructPath(GridCell current)
         {
             var path = new List<GridCell>();
 
@@ -175,7 +242,7 @@ namespace _Project
             }
 
             path.Reverse();
-            shortestPath = new List<GridCell>(path);
+            return path;
         }
 
         private void UpdateColors()
@@ -191,13 +258,35 @@ namespace _Project
 
 
                     color = _startNode.Equals(cell) ? Color.green : color;
-                    color = shortestPath.Contains(cell) ? Color.blue : color;
+
+
                     color = _valid[x, y] ? color : Color.black;
+
+                    // if (shortestPath.Count > 0)
+                    // {
+                    //     color = shortestPath[_targetNodes.First()].Contains(cell) ? Color.blue : color;
+                    // }
+
 
                     color = _targetNodes.Contains(cell) ? Color.red : color;
 
 
                     _gridDrawer2D.UpdateColor(x, y, color);
+                }
+            }
+
+            foreach (var shortestPathValue in shortestPath.Values)
+            {
+                foreach (var cell in shortestPathValue)
+                {
+                    if (_targetNodes.Contains(cell))
+                    {
+                        continue; 
+                    }
+
+                    _gridDrawer2D.UpdateColor(cell.GridPosition.x, cell.GridPosition.y,
+                        Color.Lerp(Color.blue, Color.cyan,
+                            1f * shortestPath.Values.ToList().IndexOf(shortestPathValue) / shortestPathValue.Count));
                 }
             }
         }

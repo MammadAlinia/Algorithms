@@ -16,6 +16,8 @@ namespace GridSystem
 
         public readonly Vector2 CellSize;
 
+        public readonly List<GridCell> CellList;
+
         public Grid(int width, int height, Vector3 origin, Vector2 cellSize)
         {
             Width = width;
@@ -23,6 +25,7 @@ namespace GridSystem
             CellSize = cellSize;
             Origin = origin;
 
+            CellList = new List<GridCell>();
             Cells = new GridCell[Width, Height];
             var offset = new Vector2((int)(Width / 2f), (int)(Height / 2f)) * CellSize;
 
@@ -35,8 +38,14 @@ namespace GridSystem
 
                     Cells[x, y].GridPosition = new Vector2Int(x, y);
                     Cells[x, y].WorldPosition = gridPos - offset;
+                    CellList.Add(Cells[x, y]);
                 }
             }
+        }
+
+        public Grid(List<GridCell> cellList)
+        {
+            CellList = cellList;
         }
 
         public ref GridCell WorldToCell(Vector3 position)
@@ -89,6 +98,10 @@ namespace GridSystem
                 GetCell(gridPos + Vector2Int.left),
                 GetCell(gridPos + Vector2Int.right),
                 GetCell(gridPos + Vector2Int.down),
+                GetCell(gridPos + Vector2Int.up + Vector2Int.left),
+                GetCell(gridPos + Vector2Int.up + Vector2Int.right),
+                GetCell(gridPos + Vector2Int.down + Vector2Int.left),
+                GetCell(gridPos + Vector2Int.down + Vector2Int.right),
             };
             defaultNeighbors.ExceptWith(new[] { selectedNode });
             return defaultNeighbors.ToList();
@@ -101,6 +114,7 @@ namespace GridSystem
             return GetCell(clampedX, clampedY);
         }
     }
+
     public struct GridCell : IEquatable<GridCell>
     {
         public Vector3 WorldPosition;
@@ -131,5 +145,4 @@ namespace GridSystem
             return !left.Equals(right);
         }
     }
-
 }
