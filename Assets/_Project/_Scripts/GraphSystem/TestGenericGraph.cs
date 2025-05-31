@@ -38,7 +38,7 @@ namespace GraphSystem
             }
 
             var strGraph = new Graph<string>(neighbors.Keys.ToList(), neighbors);
-            var path = strGraph.BreadthFirstSearch("A", "D");
+            var path = strGraph.DepthFirstSearch("A", "D");
 
             Debug.Log(string.Join(", ", path));
         }

@@ -40,6 +40,40 @@ namespace GraphSystem
             return ConstructPath(startNode, target, comeFrom);
         }
 
+        public static List<T> DepthFirstSearch<T>(this Graph<T> graph, T startNode, T target)
+        {
+            var toVisit = new Stack<T>();
+            var visited = new HashSet<T>();
+            var comeFrom = new Dictionary<T, T>();
+
+            toVisit.Push(startNode);
+
+            while (toVisit.Any())
+            {
+                var node = toVisit.Pop();
+
+                visited.Add(node);
+                if (node.Equals(target))
+                    return ConstructPath(startNode, target, comeFrom);
+
+
+                var neighbors = graph.GetNeighbors(node);
+
+                foreach (var neighbor in neighbors)
+                {
+                    if (!visited.Contains(neighbor))
+                    {
+                        toVisit.Push(neighbor);
+
+                        comeFrom[neighbor] = node;
+                    }
+                }
+            }
+
+            // construct path
+            return ConstructPath(startNode, target, comeFrom);
+        }
+
         private static List<T> ConstructPath<T>(T start, T target, Dictionary<T, T> comeFrom)
         {
             var path = new List<T>();
