@@ -25,7 +25,7 @@ namespace _Project
 
         private List<GridCell> _prevNeighbors = new();
         private List<GridCell> _currentNeighbors = new();
-        private readonly HashSet<GridCell> _targetNodes = new();
+        private readonly List<GridCell> _targetNodes = new();
 
         private bool[,] _valid;
 
@@ -85,7 +85,7 @@ namespace _Project
             if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetKeyDown(KeyCode.Space))
             {
                 if (!calculating)
-                  ShortestPathAStar();
+                    ShortestPathDijkstra();
             }
 
             UpdateColors();
@@ -119,9 +119,9 @@ namespace _Project
 
             shortestPath[_targetNodes.First()] = path;
             calculating = false;
-       }
+        }
 
-        public async Task ShortestPathDijkstra()
+        private void ShortestPathDijkstra()
         {
             shortestPath.Clear();
             if (_targetNodes.Count == 0)
@@ -135,71 +135,21 @@ namespace _Project
 
             Debug.Log("calculate");
 
-            calculating = true;
-            fCost = new Dictionary<GridCell, float>();
-            cameFrom = new Dictionary<GridCell, GridCell>();
 
-            var unvisitedNodes =
-                new List<GridCell>(_grid.CellList.Where(x => _valid[x.GridPosition.x, x.GridPosition.y]));
-
-            var visitedNode = new HashSet<GridCell>();
-            var heuristics = new Dictionary<GridCell, float>();
-            heuristics[_startNode] = 0;
-            currentNode = _startNode;
-
-            // calculate dijkstra
-            while (unvisitedNodes.Count != 0)
+            var path = Graph.DijkstraSearch(_startNode, _targetNodes.ToArray(), (cell1, cell2) =>
             {
-                await Awaitable.MainThreadAsync();
-                await Awaitable.NextFrameAsync();
-                currentNode = unvisitedNodes.OrderBy(x => heuristics.GetValueOrDefault(x, float.MaxValue)).First();
-                var currentHeuristic = heuristics[currentNode];
-                unvisitedNodes.Remove(currentNode);
+                if (!_valid[cell2.GridPosition.x, cell2.GridPosition.y])
+                    return float.MaxValue;
+                return Vector2Int.Distance(cell1.GridPosition, cell2.GridPosition);
+            });
 
-                foreach (GridCell neighbor in _grid.GetNeighbors(currentNode)
-                             .Where(x => _valid[x.GridPosition.x, x.GridPosition.y]))
-                {
-                    if (visitedNode.Contains(neighbor))
-                        continue;
-
-                    var distance = Vector2Int.Distance(currentNode.GridPosition, neighbor.GridPosition);
-
-
-                    var newHCost = distance + currentHeuristic;
-
-                    if (newHCost < heuristics.GetValueOrDefault(neighbor, float.MaxValue))
-                    {
-                        cameFrom[neighbor] = currentNode;
-                        heuristics[neighbor] = newHCost;
-                    }
-                }
-
-                visitedNode.Add(currentNode);
-            }
-
-            //calculate paths
-
-            foreach (GridCell target in _targetNodes)
+            for (int i = 0; i < _targetNodes.Count; i++)
             {
-                shortestPath[target] = ReconstructPath(target);
+                shortestPath[_targetNodes[i]] = path[i];
             }
-
             calculating = false;
         }
-
-        List<GridCell> ReconstructPath(GridCell current)
-        {
-            var path = new List<GridCell>();
-
-            while (cameFrom.ContainsKey(current))
-            {
-                path.Add(current);
-                current = cameFrom[current];
-            }
-
-            path.Reverse();
-            return path;
-        }
+        
 
         private void UpdateColors()
         {
