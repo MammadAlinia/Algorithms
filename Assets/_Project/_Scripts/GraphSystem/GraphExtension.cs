@@ -124,6 +124,69 @@ namespace GraphSystem
             return new List<T>();
         }
 
+        public static Dictionary<T, T> DijkstraSearch<T>(this Graph<T> graph, T startNode,
+            Func<T, T, float> calculateHeuristic)
+        {
+            var unvisited = new HashSet<T>() { startNode };
+            var visited = new HashSet<T>();
+            var heuristics = new Dictionary<T, float>();
+            var cameFrom = new Dictionary<T, T>();
+            heuristics[startNode] = 0;
+            // calculate all nodes
+
+            while (unvisited.Any())
+            {
+                var currentNode = unvisited.OrderBy(x => heuristics.GetValueOrDefault(x, float.MaxValue)).First();
+
+                var neighbors = graph.GetNeighbors(currentNode);
+                var currentHeuristic = heuristics[currentNode];
+                visited.Add(currentNode);
+
+
+                for (int i = 0; i < neighbors.Length; i++)
+                {
+                    if (visited.Contains(neighbors[i]))
+                        continue;
+
+                    var newHeuristic = currentHeuristic + calculateHeuristic(currentNode, neighbors[i]);
+
+                    if (newHeuristic < heuristics.GetValueOrDefault(neighbors[i], float.MaxValue))
+                    {
+                        cameFrom[neighbors[i]] = currentNode;
+                        heuristics[neighbors[i]] = newHeuristic;
+                        unvisited.Add(neighbors[i]);
+                    }
+                }
+
+                unvisited.Remove(currentNode);
+            }
+
+            // construct path;
+            return cameFrom;
+        }
+
+        public static List<List<T>> DijkstraSearch<T>(this Graph<T> graph, T startNode, T[] target,
+            Func<T, T, float> calculateHeuristic)
+        {
+            var result = graph.DijkstraSearch(startNode, calculateHeuristic);
+            var paths = new List<List<T>>();
+
+            foreach (T t in target)
+            {
+                paths.Add(ConstructPath(startNode, t, result));
+            }
+
+            return paths;
+        }
+
+        public static List<T> DijkstraSearch<T>(this Graph<T> graph, T startNode, T target,
+            Func<T, T, float> calculateHeuristic)
+        {
+            var result = graph.DijkstraSearch(startNode, calculateHeuristic);
+
+            return ConstructPath(startNode, target, result);
+        }
+
         private static List<T> ConstructPath<T>(T start, T target, Dictionary<T, T> comeFrom)
         {
             var path = new List<T>();
