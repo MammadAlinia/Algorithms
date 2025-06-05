@@ -85,9 +85,9 @@ namespace GraphSystem
             return true;
         }
 
-        public IEnumerable<T> GetNeighbors(T node)
+        public T[] GetNeighbors(T node)
         {
-            return AdjacencyList[node];
+            return AdjacencyList[node].ToArray();
         }
     }
 }

@@ -74,6 +74,56 @@ namespace GraphSystem
             return ConstructPath(startNode, target, comeFrom);
         }
 
+        public static List<T> AStarSearch<T>(this Graph<T> graph, T startNode, T target,
+            Func<T, T, float> calculateHeuristic)
+        {
+            var fCost = new Dictionary<T, float>();
+            var hCost = new Dictionary<T, float>();
+            var gCost = new Dictionary<T, float>();
+
+            var cameFrom = new Dictionary<T, T>();
+
+            var toVisit = new HashSet<T>();
+            var visited = new HashSet<T>();
+
+            toVisit.Add(startNode);
+
+            while (toVisit.Any())
+            {
+                var currentNode = toVisit.OrderBy(n => fCost.GetValueOrDefault(n, float.MaxValue)).First();
+
+                if (currentNode.Equals(target))
+                {
+                    // construct the shortest path
+                    return ConstructPath(startNode, target, cameFrom);
+                }
+
+                visited.Add(currentNode);
+                var neighbors = graph.GetNeighbors(currentNode);
+
+                foreach (var neighbor in neighbors)
+                {
+                    if (!visited.Contains(neighbor))
+                    {
+                        float tentativeGCost = gCost.GetValueOrDefault(currentNode, 0) + 1;
+
+                        if (!gCost.ContainsKey(neighbor) || tentativeGCost < gCost[neighbor])
+                        {
+                            cameFrom[neighbor] = currentNode;
+                            gCost[neighbor] = tentativeGCost;
+                            hCost[neighbor] = calculateHeuristic(currentNode, neighbor);
+                            fCost[neighbor] = gCost[neighbor] + hCost[neighbor];
+                            toVisit.Add(neighbor);
+                        }
+                    }
+                }
+
+                toVisit.Remove(currentNode);
+            }
+
+            return new List<T>();
+        }
+
         private static List<T> ConstructPath<T>(T start, T target, Dictionary<T, T> comeFrom)
         {
             var path = new List<T>();
