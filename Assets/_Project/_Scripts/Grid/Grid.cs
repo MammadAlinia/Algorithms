@@ -132,7 +132,7 @@ namespace GridSystem
 
         public override int GetHashCode()
         {
-            return GridPosition.GetHashCode();
+            return HashCode.Combine(WorldPosition, GridPosition);
         }
 
         public static bool operator ==(GridCell left, GridCell right)

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using GraphSystem;
 using GridSystem;
 using UnityEditor;
 using UnityEngine;
@@ -30,10 +31,14 @@ namespace _Project
 
         private bool calculating = false;
 
+        private Graph<GridCell> Graph;
 
         private void Start()
         {
             _grid = new GridSystem.Grid(width, height, transform.position, cellSize);
+
+            Graph = new Graph<GridCell>(_grid.CellList,
+                _grid.CellList.ToDictionary(x => x, x => _grid.GetNeighbors(x)));
 
             var xFactor = width * cellSize.x;
             var yFactor = height * cellSize.y;
@@ -49,6 +54,11 @@ namespace _Project
                     _valid[x, y] = true;
                 }
             }
+        }
+
+        private List<GridCell> FindNeighbors(GridCell arg)
+        {
+            return _grid.GetNeighbors(arg).ToList();
         }
 
 
@@ -75,7 +85,7 @@ namespace _Project
             if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetKeyDown(KeyCode.Space))
             {
                 if (!calculating)
-                    _ = ShortestPathDijkstra();
+                  ShortestPathAStar();
             }
 
             UpdateColors();
@@ -86,10 +96,9 @@ namespace _Project
         private GridCell currentNode = new GridCell();
         public Dictionary<GridCell, List<GridCell>> shortestPath = new Dictionary<GridCell, List<GridCell>>();
 
-        private async Task ShortestPathAStar()
+        private void ShortestPathAStar()
         {
             // calculate shortest path via a* algorithm
-
             shortestPath.Clear();
             if (_targetNodes.Count == 0)
                 return;
@@ -99,70 +108,18 @@ namespace _Project
 
             if (_targetNodes.Contains(_startNode))
                 return;
-
-            Debug.Log("calculate");
-
             calculating = true;
-            fCost = new Dictionary<GridCell, float>();
-            cameFrom = new Dictionary<GridCell, GridCell>();
 
-            currentNode = _startNode;
-            var targetNode = _targetNodes.First();
-
-
-            var toVisit = new List<GridCell>();
-            var visited = new HashSet<GridCell>();
-
-            var hCost = new Dictionary<GridCell, float>();
-            var gCost = new Dictionary<GridCell, float>();
-
-            toVisit.Add(currentNode);
-
-            while (toVisit.Count > 0)
+            var path = Graph.AStarSearch(_startNode, _targetNodes.First(), (cell1, cell2) =>
             {
-                //  currentNode = toVisit.First();
-                currentNode = toVisit.OrderBy(n => fCost.GetValueOrDefault(n, float.MaxValue)).First();
+                if (!_valid[cell2.GridPosition.x, cell2.GridPosition.y])
+                    return float.MaxValue;
+                return Vector2Int.Distance(cell1.GridPosition, cell2.GridPosition);
+            });
 
-                await Awaitable.MainThreadAsync();
-                await Awaitable.NextFrameAsync();
-
-                if (currentNode.Equals(targetNode))
-                {
-                    // construct the shortest path
-                    shortestPath[targetNode] = ReconstructPath(currentNode);
-                    calculating = false;
-                    break;
-                }
-
-                toVisit.Remove(currentNode);
-                visited.Add(currentNode);
-
-                var neighbors = _grid.GetNeighbors(currentNode);
-
-
-                foreach (var neighbor in neighbors)
-                {
-                    if (!visited.Contains(neighbor) &&
-                        _valid[neighbor.GridPosition.x, neighbor.GridPosition.y])
-                    {
-                        float tentativeGCost = gCost.GetValueOrDefault(currentNode, 0) + 1;
-
-                        if (!gCost.ContainsKey(neighbor) || tentativeGCost < gCost[neighbor])
-                        {
-                            cameFrom[neighbor] = currentNode;
-                            gCost[neighbor] = tentativeGCost;
-                            hCost[neighbor] = Vector2Int.Distance(neighbor.GridPosition, targetNode.GridPosition);
-                            fCost[neighbor] = gCost[neighbor] + hCost[neighbor];
-
-                            if (!toVisit.Contains(neighbor))
-                                toVisit.Add(neighbor);
-                        }
-                    }
-                }
-            }
-
+            shortestPath[_targetNodes.First()] = path;
             calculating = false;
-        }
+       }
 
         public async Task ShortestPathDijkstra()
         {
@@ -280,7 +237,7 @@ namespace _Project
                 {
                     if (_targetNodes.Contains(cell))
                     {
-                        continue; 
+                        continue;
                     }
 
                     _gridDrawer2D.UpdateColor(cell.GridPosition.x, cell.GridPosition.y,
