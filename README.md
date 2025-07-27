@@ -12,6 +12,7 @@
 - [x] dfs
 - [x] dijkstra
 - [x] a*
+- [x] vector flow field
 - [ ] d* lite 
 ---
 
