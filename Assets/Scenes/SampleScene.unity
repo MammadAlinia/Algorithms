@@ -148,9 +148,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d2161f8b6ce240bcb62b9867ccf20203, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  edges: []
-  edgesString: []
-  branches: []
 --- !u!4 &353277954
 Transform:
   m_ObjectHideFlags: 0
@@ -465,6 +462,7 @@ MonoBehaviour:
   width: 10
   height: 10
   cellSize: {x: 1.15, y: 1}
+  arrowPrefab: {fileID: 357366169932790206, guid: 5d3685fddc47986498655f557fb2d52a, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

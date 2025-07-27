@@ -33,9 +33,19 @@ namespace _Project
 
         private Graph<GridCell> Graph;
 
+        public Transform arrowPrefab;
+        private Dictionary<GridCell, Transform> _arrows = new Dictionary<GridCell, Transform>();
+
         private void Start()
         {
             _grid = new GridSystem.Grid(width, height, transform.position, cellSize);
+
+            foreach (var cell in _grid.Cells)
+            {
+                var arrow = Instantiate(arrowPrefab, cell.WorldPosition, Quaternion.identity);
+                arrow.localScale = Vector3.one * cellSize;
+                _arrows.Add(cell, arrow);
+            }
 
             Graph = new Graph<GridCell>(_grid.CellList,
                 _grid.CellList.ToDictionary(x => x, x => _grid.GetNeighbors(x)));
@@ -55,12 +65,6 @@ namespace _Project
                 }
             }
         }
-
-        private List<GridCell> FindNeighbors(GridCell arg)
-        {
-            return _grid.GetNeighbors(arg).ToList();
-        }
-
 
         private void Update()
         {
@@ -85,29 +89,29 @@ namespace _Project
             if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetKeyDown(KeyCode.Space))
             {
                 if (!calculating)
-                    ShortestPathDijkstra();
+                {
+                    shortestPath.Clear();
+                    if (_targetNodes.Count == 0)
+                        return;
+
+                    if (_valid[_startNode.GridPosition.x, _startNode.GridPosition.y] == false)
+                        return;
+
+                    if (_targetNodes.Contains(_startNode))
+                        return;
+                    VectorFlowField();
+                }
             }
 
             UpdateColors();
         }
 
-        Dictionary<GridCell, float> fCost = new Dictionary<GridCell, float>();
-        Dictionary<GridCell, GridCell> cameFrom = new Dictionary<GridCell, GridCell>();
-        private GridCell currentNode = new GridCell();
         public Dictionary<GridCell, List<GridCell>> shortestPath = new Dictionary<GridCell, List<GridCell>>();
 
         private void ShortestPathAStar()
         {
             // calculate shortest path via a* algorithm
-            shortestPath.Clear();
-            if (_targetNodes.Count == 0)
-                return;
 
-            if (_valid[_startNode.GridPosition.x, _startNode.GridPosition.y] == false)
-                return;
-
-            if (_targetNodes.Contains(_startNode))
-                return;
             calculating = true;
 
             var path = Graph.AStarSearch(_startNode, _targetNodes.First(), (cell1, cell2) =>
@@ -121,21 +125,24 @@ namespace _Project
             calculating = false;
         }
 
+        private void VectorFlowField()
+        {
+            var path = Graph.DijkstraSearch(_startNode, (cell1, cell2) =>
+            {
+                if (!_valid[cell2.GridPosition.x, cell2.GridPosition.y])
+                    return float.MaxValue;
+                return Vector2Int.Distance(cell1.GridPosition, cell2.GridPosition);
+            });
+
+            foreach (KeyValuePair<GridCell, GridCell> keyValuePair in path)
+            {
+                var direction = (keyValuePair.Key.WorldPosition - keyValuePair.Value.WorldPosition).normalized;
+                _arrows[keyValuePair.Key].up = direction;
+            }
+        }
+
         private void ShortestPathDijkstra()
         {
-            shortestPath.Clear();
-            if (_targetNodes.Count == 0)
-                return;
-
-            if (_valid[_startNode.GridPosition.x, _startNode.GridPosition.y] == false)
-                return;
-
-            if (_targetNodes.Contains(_startNode))
-                return;
-
-            Debug.Log("calculate");
-
-
             var path = Graph.DijkstraSearch(_startNode, _targetNodes.ToArray(), (cell1, cell2) =>
             {
                 if (!_valid[cell2.GridPosition.x, cell2.GridPosition.y])
@@ -147,9 +154,10 @@ namespace _Project
             {
                 shortestPath[_targetNodes[i]] = path[i];
             }
+
             calculating = false;
         }
-        
+
 
         private void UpdateColors()
         {
@@ -162,11 +170,12 @@ namespace _Project
                         ? Color.gray
                         : Color.Lerp(Color.clear, Color.white, .3f);
 
-
                     color = _startNode.Equals(cell) ? Color.green : color;
 
 
                     color = _valid[x, y] ? color : Color.black;
+                    _arrows[cell].gameObject.SetActive(_valid[x, y]);
+
 
                     // if (shortestPath.Count > 0)
                     // {
@@ -253,21 +262,5 @@ namespace _Project
                 }
             }
         }
-
-#if UNITY_EDITOR
-        private void OnDrawGizmos()
-        {
-            if (_grid != null && currentNode != null)
-            {
-                Gizmos.DrawWireSphere(currentNode.WorldPosition, .4f);
-
-                foreach (var f in fCost)
-                {
-                    Handles.color = Color.black;
-                    Handles.Label(f.Key.WorldPosition, f.Value.ToString("F1"));
-                }
-            }
-        }
-#endif
     }
 }
